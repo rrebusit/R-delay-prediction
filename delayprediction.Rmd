@@ -1,0 +1,145 @@
+---
+title: "delay"
+author: "Rica Rebusit"
+date: "2023-07-22"
+output: html_document
+---
+I will be using this dataset from Kaggle -> [Click Me!](https://www.kaggle.com/datasets/ulrikthygepedersen/airlines-delay?resource=download&select=airlines_delay.csv) to predict if a flight will be delayed based on:
+
+- **Flight**: Flight ID
+- **Time**: Time of departure
+- **Length**: Length of flight
+- **Airline**: Airline ID
+- **AirportFrom**: Which airport the flight flew from
+- **AirportTo**: Which airport the flight flew to
+- **DayOfWeek**: Day of the week of flight
+- **Class**: Whether the flight was delayed depicted by (1) and (0) if not delayed
+
+This dataset also has 539382 observations
+
+# Loading Necessary Libraries and Importing dataset
+
+```{r, warning=FALSE}
+library(tidyverse)
+library(randomForest)
+```
+
+```{r}
+delay <- read.csv("~/Documents/delay-prediction/airlines_delay.csv")
+```
+
+# Checking the Data and EDA
+Looking at the first 6 rows
+```{r}
+head(delay)
+```
+
+Checking the data types of each variable
+```{r}
+str(delay)
+```
+
+Looking at unique values of categorical variables
+```{r}
+unique(delay$Airline)
+```
+```{r}
+unique(delay$AirportFrom)
+```
+```{r}
+unique(delay$AirportTo)
+```
+
+Variable **Class** is a integer when we want it to be a factor in order to predict so convert **Class** to a factor
+```{r}
+delay$Class <- as.factor(delay$Class)
+str(delay$Class)
+```
+
+Checking to see if there are NA values
+```{r}
+colSums(is.na(delay))
+```
+
+Dropping column **Flight** because there is no significance for the flight ID
+```{r}
+delay <- delay %>%
+  select(-"Flight")
+head(delay)
+```
+
+Now time to do some exploration by comparing **Airline** to other variables. First checking the count of delays in each airline
+```{r}
+ggplot(delay, aes(Airline, fill = Class)) + geom_bar(position="dodge") + theme_minimal() + scale_fill_brewer(palette = "Accent") + labs(title = "Airline Delay Count") + theme(plot.title = element_text(family = "Courier New", size = 20, face = "bold", hjust = 0.5))
+```
+It seems like WN has more delays
+```{r}
+count(filter(delay, Class == 1, Airline == "WN")) #WN has 65657 delays
+```
+Checking the count of delays
+```{r}
+ggplot(delay, aes(Class)) + geom_bar(fill = "Lightblue", color = "Blue") + theme_minimal() + labs(title = "Delay Count") + theme(plot.title = element_text(family = "Courier New", size = 20, face = "bold", hjust = 0.5))
+```
+More no delays than delays
+
+Looking at time departure
+```{r}
+ggplot(delay, aes(Airline, Time)) + geom_boxplot(fill = "Lightblue", color = "Blue") + theme_minimal() + labs(title = "Airline Departure Time") + theme(plot.title = element_text(family = "Courier New", size = 20, face = "bold", hjust = 0.5))
+```
+All airlines seem to departure at the same time
+
+```{r, warning=FALSE}
+ggplot(delay, aes(Time, fill = Airline)) + geom_histogram(position="stack") + theme_minimal() + labs(title = "Departure Time Distribution") + theme(plot.title = element_text(family = "Courier New", size = 20, face = "bold", hjust = 0.5))
+```
+
+Looking at length of flight
+```{r}
+ggplot(delay, aes(Airline, Length)) + geom_boxplot(fill = "Lightblue", color = "Blue") + theme_minimal() + labs(title = "Airline Length Time") + theme(plot.title = element_text(family = "Courier New", size = 20, face = "bold", hjust = 0.5))
+```
+Seeing which the airline with max length and min length
+```{r}
+delay$Airline[which.max(delay$Length)] #CO
+delay$Length[which.max(delay$Length)] #655
+```
+```{r}
+head(filter(delay, Length == 655))
+```
+So airline CO departing from EWR flying to HNL has the greatest flight length
+
+```{r}
+delay$Airline[which.min(delay$Length)] #F9
+delay$Length[which.min(delay$Length)] #0
+```
+
+```{r}
+head(filter(delay, Length == 0))
+```
+Airline B6 also has flight length 0. Maybe the flights were cancelled and both looks like to be towards the weekend.
+
+```{r, warning=FALSE}
+ggplot(delay, aes(Length, fill = Airline)) + geom_histogram(position="stack") + theme_minimal() + labs(title = "Departure Length Distribution") + theme(plot.title = element_text(family = "Courier New", size = 20, face = "bold", hjust = 0.5))
+```
+Right skewed
+
+Checking which day of the week is most popular for flights
+```{r}
+ggplot(delay, aes(DayOfWeek)) + geom_bar(fill = "Lightblue", color = "Blue") + theme_minimal() + labs(title = "Popular Days") + theme(plot.title = element_text(family = "Courier New", size = 20, face = "bold", hjust = 0.5))
+```
+During the middle of the weeks is most popular for flights
+
+Now that we explored the data, dropped a column, and changed **Class** variable type, let's start to predict!
+
+# Train and Test Data
+Since we have a pretty large dataset, we can use a 80-20 split
+```{r}
+tra.tes <- sample(nrow(delay), 0.7*nrow(delay))
+train <- delay[tra.tes, ]
+test <- delay[-tra.tes, ]
+```
+
+# Logistic Regression
+```{r}
+#logistic <- glm(Class ~., data = train, family = binomial)
+```
+
+Dataset may be too large for my computer
