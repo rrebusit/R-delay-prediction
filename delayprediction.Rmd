@@ -22,6 +22,7 @@ This dataset also has 539382 observations
 ```{r, warning=FALSE}
 library(tidyverse)
 library(randomForest)
+library(caret)
 ```
 
 ```{r}
@@ -69,23 +70,28 @@ head(delay)
 ```
 
 Now time to do some exploration by comparing **Airline** to other variables. First checking the count of delays in each airline
+
 ```{r}
 ggplot(delay, aes(Airline, fill = Class)) + geom_bar(position="dodge") + theme_minimal() + scale_fill_brewer(palette = "Accent") + labs(title = "Airline Delay Count") + theme(plot.title = element_text(family = "Courier New", size = 20, face = "bold", hjust = 0.5))
 ```
+
 It seems like WN has more delays
 ```{r}
 count(filter(delay, Class == 1, Airline == "WN")) #WN has 65657 delays
 ```
+
 Checking the count of delays
 ```{r}
 ggplot(delay, aes(Class)) + geom_bar(fill = "Lightblue", color = "Blue") + theme_minimal() + labs(title = "Delay Count") + theme(plot.title = element_text(family = "Courier New", size = 20, face = "bold", hjust = 0.5))
 ```
+
 More no delays than delays
 
 Looking at time departure
 ```{r}
 ggplot(delay, aes(Airline, Time)) + geom_boxplot(fill = "Lightblue", color = "Blue") + theme_minimal() + labs(title = "Airline Departure Time") + theme(plot.title = element_text(family = "Courier New", size = 20, face = "bold", hjust = 0.5))
 ```
+
 All airlines seem to departure at the same time
 
 ```{r, warning=FALSE}
@@ -96,6 +102,7 @@ Looking at length of flight
 ```{r}
 ggplot(delay, aes(Airline, Length)) + geom_boxplot(fill = "Lightblue", color = "Blue") + theme_minimal() + labs(title = "Airline Length Time") + theme(plot.title = element_text(family = "Courier New", size = 20, face = "bold", hjust = 0.5))
 ```
+
 Seeing which the airline with max length and min length
 ```{r}
 delay$Airline[which.max(delay$Length)] #CO
@@ -119,12 +126,14 @@ Airline B6 also has flight length 0. Maybe the flights were cancelled and both l
 ```{r, warning=FALSE}
 ggplot(delay, aes(Length, fill = Airline)) + geom_histogram(position="stack") + theme_minimal() + labs(title = "Departure Length Distribution") + theme(plot.title = element_text(family = "Courier New", size = 20, face = "bold", hjust = 0.5))
 ```
+
 Right skewed
 
 Checking which day of the week is most popular for flights
 ```{r}
 ggplot(delay, aes(DayOfWeek)) + geom_bar(fill = "Lightblue", color = "Blue") + theme_minimal() + labs(title = "Popular Days") + theme(plot.title = element_text(family = "Courier New", size = 20, face = "bold", hjust = 0.5))
 ```
+
 During the middle of the weeks is most popular for flights
 
 Now that we explored the data, dropped a column, and changed **Class** variable type, let's start to predict!
@@ -137,9 +146,66 @@ train <- delay[tra.tes, ]
 test <- delay[-tra.tes, ]
 ```
 
-# Logistic Regression
+# Random Forest - Model Building
 ```{r}
-#logistic <- glm(Class ~., data = train, family = binomial)
+set.seed(123)
+rf <- randomForest(Class ~ ., data = train, importance = TRUE, ntree = 100)
 ```
 
-Dataset may be too large for my computer
+# Random Forest - Evaluation
+```{r}
+pred <- predict(rf, newdata = test)
+```
+
+Creating a confusion matrix
+```{r}
+cf <- table(test$Class, pred)
+cf
+```
+
+Making matrix an object to calculate accuracy and precision
+```{r}
+evaluate <- confusionMatrix(cf)
+```
+
+Calculating accuracy
+```{r}
+accuracy <- evaluate$overall["Accuracy"]
+accuracy
+```
+
+Calculating precision
+```{r}
+precision <- evaluate$byClass["Precision"]
+precision
+```
+
+# Random Forest - Visualizing
+Creating a heatmap. Making the confusion matrix a data frame
+```{r}
+cf.df <- as.data.frame(as.matrix(cf))
+```
+
+Now using ggplot to great heatmap
+```{r}
+ggplot(cf.df, aes(x = Var1, y = pred)) + geom_tile(aes(fill = Freq), color = "yellow") + scale_fill_gradient(low = "lightblue", high = "steelblue") + labs(x = "Predicted", y = "True", fill = "Frequency") + theme_minimal() + labs(title = "Confusion Matrix") + theme(plot.title = element_text(family = "Courier New", size = 20, face = "bold", hjust = 0.5))
+```
+
+Creating an importance graph. First making a data frame
+
+```{r}
+importance <- as.data.frame(round(importance(rf), digits = 4))
+mdg <- importance[, "MeanDecreaseGini"]
+imp.df <- data.frame(feature = row.names(importance), importance = mdg)
+```
+
+Now creating a ggplot graph
+
+```{r}
+ggplot(imp.df, aes(x = feature, y = importance)) +
+  geom_bar(stat = "identity", fill = "steelblue") +
+  labs(title = "Important Variables to Predict Flight Delay", x = "Variable", y = "Importance") + theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1)) + theme(plot.title = element_text(family = "Courier New", size = 10, face = "bold", hjust = 0.5))
+```
+
+Overall the Random Forest model did okay, but it is not the best
+
