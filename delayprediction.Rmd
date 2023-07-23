@@ -132,7 +132,7 @@ Now that we explored the data, dropped a column, and changed **Class** variable 
 # Train and Test Data
 Since we have a pretty large dataset, we can use a 80-20 split
 ```{r}
-tra.tes <- sample(nrow(delay), 0.7*nrow(delay))
+tra.tes <- sample(nrow(delay), 0.8*nrow(delay))
 train <- delay[tra.tes, ]
 test <- delay[-tra.tes, ]
 ```
